@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react"
+import { format, addHours } from "date-fns"
+import { fr } from "date-fns/locale"
 
 interface ChannelData {
   name: string
@@ -22,6 +24,10 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
         )
         const data = await response.json()
 
+        if (!data.channel || !data.feeds) {
+          throw new Error("Réponse de l'API invalide")
+        }
+
         const channelInfo: ChannelData = {
           name: data.channel.name,
           fields: {},
@@ -37,7 +43,7 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
           }
         }
 
-        // Extract data for each field
+        // Extract data for each field and adjust the time back
         data.feeds.forEach((feed: any) => {
           Object.keys(channelInfo.fields).forEach((fieldKey) => {
             if (feed[fieldKey] !== null) {
@@ -52,6 +58,7 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
         setChannelData(channelInfo)
       } catch (err) {
         setError("Erreur lors de la récupération des données")
+        console.error(err)
       } finally {
         setIsLoading(false)
       }
@@ -62,4 +69,3 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
 
   return { channelData, isLoading, error }
 }
-

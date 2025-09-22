@@ -1,7 +1,32 @@
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "export": "next export",
-  "lint": "next lint"
+{
+  "name": "station-de-pompage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "next lint",
+    "start": "next start"
+  },
+  "dependencies": {
+    "chart.js": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "latest",
+    "lucide-react": "^0.454.0",
+    "next": "15.2.4",
+    "react": "^19",
+    "react-chartjs-2": "latest",
+    "react-dom": "^19",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "postcss": "^8.5",
+    "tailwindcss": "4.1.13",
+    "typescript": "^5"
+  }
 }
