@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import type { Channel, ProcessedData } from "@/config/channels"
+import type { ChannelConfig, ProcessedData } from "@/config/channels"
 
 interface FlowCalculationResult {
   processedData: ProcessedData[]
@@ -22,7 +22,7 @@ function movingAverage(data: number[], windowSize: number): number[] {
   return result
 }
 
-export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculationResult => {
+export const useFlowCalculations = (data: any[], channel: ChannelConfig): FlowCalculationResult => {
   return useMemo(() => {
     if (!channel.enableFlowCalculation || !channel.surface || data.length === 0) {
       return {
