@@ -1,7 +1,6 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import type { Channel, EmailGroup } from "@/config/channels"
+import { sendEmail } from "@/services/emailService"
 
 interface AlertState {
   isNTH: boolean
@@ -88,6 +87,10 @@ async function sendAlert(
       break
   }
 
-  // Log the alert instead of sending email
-  console.log(`Alerte ${type} pour ${channel.name}:`, { subject, text, emailAddresses })
+  const success = await sendEmail(emailAddresses, subject, text)
+  if (success) {
+    console.log(`Alerte ${type} envoyée pour ${channel.name}`)
+  } else {
+    console.error(`Échec de l'envoi de l'alerte ${type} pour ${channel.name}`)
+  }
 }
