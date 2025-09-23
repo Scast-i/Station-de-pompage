@@ -1,6 +1,6 @@
+"use client"
+
 import { useState, useEffect } from "react"
-import { format, addHours } from "date-fns"
-import { fr } from "date-fns/locale"
 
 interface ChannelData {
   name: string
@@ -19,9 +19,15 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
       setError(null)
 
       try {
-        const response = await fetch(
-          `https://api.thingspeak.com/channels/${channelId}/feeds.json?start=${start}&end=${end}`,
-        )
+        // Use a CORS proxy for the API call
+        const proxyUrl = "https://api.allorigins.win/raw?url="
+        const targetUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?start=${start}&end=${end}`
+        const response = await fetch(proxyUrl + encodeURIComponent(targetUrl))
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
         const data = await response.json()
 
         if (!data.channel || !data.feeds) {
@@ -43,10 +49,10 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
           }
         }
 
-        // Extract data for each field and adjust the time back
+        // Extract data for each field
         data.feeds.forEach((feed: any) => {
           Object.keys(channelInfo.fields).forEach((fieldKey) => {
-            if (feed[fieldKey] !== null) {
+            if (feed[fieldKey] !== null && feed[fieldKey] !== undefined) {
               channelInfo.data[fieldKey].push({
                 date: feed.created_at,
                 value: Number.parseFloat(feed[fieldKey]),
@@ -57,14 +63,16 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
 
         setChannelData(channelInfo)
       } catch (err) {
-        setError("Erreur lors de la récupération des données")
-        console.error(err)
+        console.error("Erreur lors de la récupération des données:", err)
+        setError("Erreur lors de la récupération des données. Vérifiez votre connexion internet.")
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchData()
+    if (channelId && start && end) {
+      fetchData()
+    }
   }, [channelId, start, end])
 
   return { channelData, isLoading, error }
