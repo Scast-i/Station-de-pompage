@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-import { CalendarIcon, TrendingUp, TrendingDown, BarChart, AlertCircle } from "lucide-react"
+import { CalendarIcon, TrendingUp, TrendingDown, BarChart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { channels, type ChannelConfig } from "@/config/channels"
 import { useThingSpeakData } from "@/hooks/useThingSpeakData"
@@ -35,6 +35,8 @@ export default function ThingSpeakVisualizer() {
   const [startTime, setStartTime] = useState("00:00")
   const [endDate, setEndDate] = useState<Date | undefined>(new Date())
   const [endTime, setEndTime] = useState("23:59")
+  const [instantFlowField, setInstantFlowField] = useState("field6")
+  const [flowIndexField, setFlowIndexField] = useState("field5")
 
   // Récupération des données ThingSpeak
   const { channelData, isLoading, error } = useThingSpeakData(
@@ -160,9 +162,17 @@ export default function ThingSpeakVisualizer() {
     },
   }
 
+  const getLatestFieldValue = (fieldKey: string) => {
+    if (channelData && channelData.data[fieldKey]?.length > 0) {
+      return channelData.data[fieldKey][channelData.data[fieldKey].length - 1].value.toFixed(2)
+    }
+    return "N/A"
+  }
+
+  //
   return (
     <div className="container mx-auto p-4 max-w-full overflow-x-hidden">
-      <h1 className="text-2xl font-bold mb-4">Station de Pompage - Vision</h1>
+      <h1 className="text-2xl font-bold mb-4">Station de Pompage - Vision </h1>
 
       {/* Sélection des paramètres */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -261,29 +271,9 @@ export default function ThingSpeakVisualizer() {
 
       {/* Graphique principal */}
       <div className="mt-4 h-[50vh] md:h-[60vh] bg-white p-4 rounded-lg border">
-        {isLoading && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p>Chargement des données...</p>
-            </div>
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-red-500">
-              <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-              <p>{error}</p>
-              <p className="text-sm mt-2">Vérifiez votre connexion internet et réessayez.</p>
-            </div>
-          </div>
-        )}
-        {!isLoading && !error && channelData && <Line options={chartOptions} data={chartData} />}
-        {!isLoading && !error && !channelData && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">Aucune donnée disponible pour cette période.</p>
-          </div>
-        )}
+        {isLoading && <p className="text-center">Chargement des données...</p>}
+        {error && <p className="text-red-500 text-center">{error}</p>}
+        {!isLoading && !error && <Line options={chartOptions} data={chartData} />}
       </div>
     </div>
   )
