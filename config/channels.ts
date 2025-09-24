@@ -34,8 +34,8 @@ export const channels: Channel[] = [
   { id: 2792378, name: "Med_SPTR", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2791830, name: "SP4 Houmet Souk", enableFlowCalculation: false, emailGroup: 1 },
 
-  { id: 2783757, name: "P4_SidiMansour", enableFlowCalculation: false, emailGroup: 1 },
-  { id: 2796053, name: "SP3 Houmet Souk", enableFlowCalculation: false, emailGroup: 1 },
+  { id: 2783757, name: "MI_SR3", enableFlowCalculation: false, emailGroup: 1 },
+  { id: 2796053, name: "P4_SidiMansour", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2783936, name: "SRT5 Midoune", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2782228, name: "Midpun_SRJ2", enableFlowCalculation: false, emailGroup: 1 },
 
