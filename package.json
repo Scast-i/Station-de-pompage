@@ -12,15 +12,20 @@
     "start": "next start"
   },
   "dependencies": {
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.2",
     "@shadcn/ui": "^0.0.4",
     "chart.js": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "latest",
+    "geist": "^1.2.0",
     "lucide-react": "^0.454.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-chartjs-2": "latest",
+    "react-day-picker": "^8.10.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7"
@@ -30,7 +35,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "19.2.2",
     "postcss": "^8.5",
-    "tailwindcss": "4.1.16",
+    "tailwindcss": "^4.1.9",
     "typescript": "^5",
     "v0-cli": "^1.0.0"
   }
