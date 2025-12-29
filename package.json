@@ -3,19 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "predeploy": "npm run build && npm run export",
-    "deploy": "v0 deploy",
     "dev": "next dev",
-    "export": "next export",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint",
-    "start": "next start"
+    "export": "next export"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.0.7",
     "@radix-ui/react-select": "^2.0.0",
     "@radix-ui/react-slot": "^1.0.2",
-    "@shadcn/ui": "^0.0.4",
     "@vercel/analytics": "^1.4.1",
     "chart.js": "^4.4.0",
     "class-variance-authority": "0.7.1",
@@ -25,16 +22,16 @@
     "lucide-react": "^0.264.0",
     "next": "14.2.35",
     "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-day-picker": "^8.10.0",
-    "react-dom": "^18.2.0",
     "tailwind-merge": "3.3.1",
     "tailwindcss-animate": "1.0.7"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "19.2.2",
+    "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.17",
