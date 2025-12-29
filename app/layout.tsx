@@ -15,8 +15,8 @@ const robotoMono = Roboto_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "Station de Pompage - Monitoring",
+  description: "Surveillance en temps réel des stations de pompage",
   generator: "v0.app",
   icons: {
     icon: [
