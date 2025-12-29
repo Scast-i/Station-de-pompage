@@ -11,6 +11,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"],
+        mono: ["var(--font-roboto-mono)", "monospace"],
+      },
       colors: {
         gray: colors.gray,
         slate: colors.slate,
