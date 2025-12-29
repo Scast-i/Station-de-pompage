@@ -1,6 +1,6 @@
+"use client"
+
 import { useState, useEffect } from "react"
-import { format, addHours } from "date-fns"
-import { fr } from "date-fns/locale"
 
 interface ChannelData {
   name: string
@@ -43,14 +43,17 @@ export function useThingSpeakData(channelId: number, start: string, end: string)
           }
         }
 
-        // Extract data for each field and adjust the time back
+        // Extract data for each field
         data.feeds.forEach((feed: any) => {
           Object.keys(channelInfo.fields).forEach((fieldKey) => {
-            if (feed[fieldKey] !== null) {
-              channelInfo.data[fieldKey].push({
-                date: feed.created_at,
-                value: Number.parseFloat(feed[fieldKey]),
-              })
+            if (feed[fieldKey] !== null && feed[fieldKey] !== undefined) {
+              const val = Number.parseFloat(feed[fieldKey])
+              if (!isNaN(val)) {
+                channelInfo.data[fieldKey].push({
+                  date: feed.created_at,
+                  value: val,
+                })
+              }
             }
           })
         })
