@@ -5,13 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-import { CalendarIcon, Activity, Droplet, TrendingUp } from "lucide-react"
+import { CalendarIcon, TrendingUp, TrendingDown, BarChart } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { channels, type ChannelConfig } from "@/config/channels"
 import { useThingSpeakData } from "@/hooks/useThingSpeakData"
+import { useFlowCalculations } from "@/hooks/useFlowCalculations"
 import { Line } from "react-chartjs-2"
 import {
   Chart as ChartJS,
@@ -22,19 +22,12 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler,
 } from "chart.js"
 import { Input } from "@/components/ui/input"
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
-const colors = {
-  primary: "rgba(20, 184, 166, 1)",
-  primaryGlow: "rgba(20, 184, 166, 0.2)",
-  secondary: "rgba(96, 165, 250, 1)",
-  secondaryGlow: "rgba(96, 165, 250, 0.2)",
-  warning: "rgba(251, 191, 36, 1)",
-}
+const colors = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"]
 
 export default function ThingSpeakVisualizer() {
   const [selectedChannel, setSelectedChannel] = useState<ChannelConfig>(channels[0])
@@ -42,269 +35,246 @@ export default function ThingSpeakVisualizer() {
   const [startTime, setStartTime] = useState("00:00")
   const [endDate, setEndDate] = useState<Date | undefined>(new Date())
   const [endTime, setEndTime] = useState("23:59")
+  const [instantFlowField, setInstantFlowField] = useState("field6")
+  const [flowIndexField, setFlowIndexField] = useState("field5")
 
+  // Récupération des données ThingSpeak
   const { channelData, isLoading, error } = useThingSpeakData(
     selectedChannel.id,
-    startDate ? `${format(startDate, "yyyy-MM-dd")}T${startTime}:00` : "",
-    endDate ? `${format(endDate, "yyyy-MM-dd")}T${endTime}:59` : "",
+    startDate ? `${format(startDate, "yyyy-MM-dd", { locale: fr })}T${startTime}:00` : "",
+    endDate ? `${format(endDate, "yyyy-MM-dd", { locale: fr })}T${endTime}:59` : "",
+  )
+
+  // Calculs des débits
+  const { processedData, averageQEntree, totalQSortie, volumeIndex } = useFlowCalculations(
+    channelData?.data.field1 || [],
+    selectedChannel,
   )
 
   const chartData = useMemo(() => {
     if (!channelData) return { labels: [], datasets: [] }
 
-    const allDates = new Set<string>()
-    Object.values(channelData.data).forEach((fieldData) => {
-      fieldData.forEach((item) => allDates.add(item.date))
-    })
+    const labels =
+      channelData.data[Object.keys(channelData.data)[0]]?.map((item) =>
+        format(new Date(item.date), "dd/MM/yyyy HH:mm", { locale: fr }),
+      ) || []
 
-    const sortedDates = Array.from(allDates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-    const labels = sortedDates.map((d) => format(new Date(d), "HH:mm", { locale: fr }))
-
-    const datasets = Object.entries(channelData.fields).map(([fieldKey, fieldName], index) => {
-      const dataMap = new Map(channelData.data[fieldKey].map((item) => [item.date, item.value]))
-
-      return {
-        label: fieldName,
-        data: sortedDates.map((d) => dataMap.get(d) ?? null),
-        borderColor: index === 0 ? colors.primary : colors.secondary,
-        backgroundColor: index === 0 ? colors.primaryGlow : colors.secondaryGlow,
-        tension: 0.4,
-        spanGaps: true,
-        fill: true,
-        pointRadius: 0,
-        borderWidth: 2,
-      }
-    })
+    const datasets = [
+      ...Object.entries(channelData.fields).flatMap(([fieldKey, fieldName], index) => {
+        if (fieldKey === "field1") {
+          // Niveau
+          return [
+            {
+              label: "Niveau brut",
+              data: channelData.data[fieldKey].map((item) => item.value / 100),
+              borderColor: colors[index % colors.length],
+              backgroundColor: colors[index % colors.length] + "80",
+              yAxisID: "y_level",
+            },
+            ...(selectedChannel.enableFiltering
+              ? [
+                  {
+                    label: "Niveau filtré",
+                    data: processedData.map((d) => d.filteredLevel),
+                    borderColor: "rgba(255, 99, 132, 1)",
+                    backgroundColor: "rgba(255, 99, 132, 0.2)",
+                    borderDash: [5, 5],
+                    yAxisID: "y_level",
+                  },
+                ]
+              : []),
+          ]
+        } else {
+          // Autres champs
+          return {
+            label: fieldName,
+            data: channelData.data[fieldKey].map((item) => item.value),
+            borderColor: colors[index % colors.length],
+            backgroundColor: colors[index % colors.length] + "80",
+            yAxisID: "y",
+          }
+        }
+      }),
+      ...(selectedChannel.enableFlowCalculation
+        ? [
+            {
+              label: "Débit Entrée (Qe)",
+              data: processedData.map((d) => d.Q_entree),
+              borderColor: "#3b82f6",
+              borderWidth: 2,
+              borderDash: [5, 5],
+              pointRadius: 0,
+              yAxisID: "y",
+            },
+            {
+              label: "Débit Sortie (Qs)",
+              data: processedData.map((d) => d.Q_sortie),
+              borderColor: "#ef4444",
+              borderWidth: 2,
+              borderDash: [5, 5],
+              pointRadius: 0,
+              yAxisID: "y",
+            },
+          ]
+        : []),
+    ]
 
     return { labels, datasets }
-  }, [channelData])
+  }, [channelData, processedData, selectedChannel.enableFlowCalculation])
 
-  const metrics = useMemo(() => {
-    if (!channelData) return { currentLevel: 0, avgLevel: 0, maxLevel: 0 }
-
-    const firstField = Object.keys(channelData.data)[0]
-    const data = channelData.data[firstField] || []
-
-    const values = data.map((d) => d.value)
-    const currentLevel = values[values.length - 1] || 0
-    const avgLevel = values.reduce((a, b) => a + b, 0) / values.length || 0
-    const maxLevel = Math.max(...values, 0)
-
-    return { currentLevel, avgLevel, maxLevel }
-  }, [channelData])
-
+  // Configuration du graphique
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: true,
         position: "top" as const,
-        labels: {
-          color: "rgb(209, 213, 219)",
-          font: { size: 12, family: "Inter" },
-          padding: 16,
-          usePointStyle: true,
-        },
       },
-      title: { display: false },
-      tooltip: {
-        mode: "index" as const,
-        intersect: false,
-        backgroundColor: "rgba(30, 41, 59, 0.95)",
-        titleColor: "rgb(209, 213, 219)",
-        bodyColor: "rgb(209, 213, 219)",
-        borderColor: "rgba(20, 184, 166, 0.3)",
-        borderWidth: 1,
-        padding: 12,
-        displayColors: true,
+      title: {
+        display: true,
+        text: channelData ? `Données pour ${channelData.name}` : "Chargement...",
       },
     },
     scales: {
       x: {
-        grid: {
-          color: "rgba(255, 255, 255, 0.05)",
-          drawBorder: false,
-        },
         ticks: {
-          color: "rgb(148, 163, 184)",
-          font: { size: 11 },
+          maxRotation: 45,
+          minRotation: 45,
         },
       },
       y: {
-        beginAtZero: false,
-        grid: {
-          color: "rgba(255, 255, 255, 0.05)",
-          drawBorder: false,
+        position: "right",
+        title: {
+          display: true,
+          text: "Débit (m³/h)",
         },
-        ticks: {
-          color: "rgb(148, 163, 184)",
-          font: { size: 11 },
+      },
+      y_level: {
+        position: "left",
+        title: {
+          display: true,
+          text: "Niveau (m)",
+        },
+        grid: {
+          drawOnChartArea: false,
         },
       },
     },
-    interaction: {
-      mode: "nearest" as const,
-      axis: "x" as const,
-      intersect: false,
-    },
   }
 
+  const getLatestFieldValue = (fieldKey: string) => {
+    if (channelData && channelData.data[fieldKey]?.length > 0) {
+      return channelData.data[fieldKey][channelData.data[fieldKey].length - 1].value.toFixed(2)
+    }
+    return "N/A"
+  }
+
+  //
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Droplet className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">Station de Pompage</h1>
-                <p className="text-sm text-muted-foreground">Surveillance en Temps Réel</p>
-              </div>
+    <div className="container mx-auto p-4 max-w-full overflow-x-hidden">
+      <h1 className="text-2xl font-bold mb-4">Station de Pompage - Vision </h1>
+
+      {/* Sélection des paramètres */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <Select
+          value={selectedChannel.id.toString()}
+          onValueChange={(value) => {
+            const channel = channels.find((c) => c.id.toString() === value)!
+            setSelectedChannel(channel)
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Sélectionnez une chaîne" />
+          </SelectTrigger>
+          <SelectContent>
+            {channels.map((channel) => (
+              <SelectItem key={channel.id} value={channel.id.toString()}>
+                <div className="flex items-center gap-2">
+                  <span>{channel.name}</span>
+                  {channel.enableFlowCalculation && (
+                    <span className="text-xs text-green-600">({channel.surface}m²)</span>
+                  )}
+                  {channel.enableFiltering && <span className="text-xs text-blue-600">(Filtré)</span>}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Sélection date/heure début */}
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDate ? format(startDate, "PPP", { locale: fr }) : <span>Date de début</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus locale={fr} />
+            </PopoverContent>
+          </Popover>
+          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-[100px]" />
+        </div>
+
+        {/* Sélection date/heure fin */}
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(endDate, "PPP", { locale: fr }) : <span>Date de fin</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus locale={fr} />
+            </PopoverContent>
+          </Popover>
+          <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-[100px]" />
+        </div>
+      </div>
+
+      {/* Indicateurs de débit */}
+      {selectedChannel.enableFlowCalculation && channelData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <h3 className="text-sm font-semibold text-blue-800">Débit Entrée Moyen</h3>
             </div>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-              <Activity className="w-3 h-3 mr-1" />
-              En Ligne
-            </Badge>
+            <p className="text-2xl font-bold text-blue-600">{averageQEntree.toFixed(2)} m³/h</p>
+          </div>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="h-5 w-5 text-red-600" />
+              <h3 className="text-sm font-semibold text-red-800">Débit Instantané</h3>
+            </div>
+            <p className="text-2xl font-bold text-red-600">
+              {processedData.length > 0 ? processedData[processedData.length - 1].Q_sortie.toFixed(2) : "N/A"} m³/h
+            </p>
+          </div>
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart className="h-5 w-5 text-green-600" />
+              <h3 className="text-sm font-semibold text-green-800">Index de Volume</h3>
+            </div>
+            <p className="text-2xl font-bold text-green-600">{volumeIndex.toFixed(2)} m³</p>
           </div>
         </div>
-      </header>
+      )}
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-lg">Contrôles</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select
-                value={selectedChannel.id.toString()}
-                onValueChange={(value) => {
-                  const channel = channels.find((c) => c.id.toString() === value)!
-                  setSelectedChannel(channel)
-                }}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Sélectionnez une station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {channels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id.toString()}>
-                      {channel.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start bg-background">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "dd/MM/yyyy") : "Début"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={fr} />
-                  </PopoverContent>
-                </Popover>
-                <Input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-[100px] bg-background"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start bg-background">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "dd/MM/yyyy") : "Fin"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={fr} />
-                  </PopoverContent>
-                </Popover>
-                <Input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-[100px] bg-background"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Niveau Actuel</CardTitle>
-              <Droplet className="w-4 h-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{metrics.currentLevel.toFixed(2)} m</div>
-              <p className="text-xs text-muted-foreground mt-1">Dernière mesure</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Niveau Moyen</CardTitle>
-              <TrendingUp className="w-4 h-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{metrics.avgLevel.toFixed(2)} m</div>
-              <p className="text-xs text-muted-foreground mt-1">Sur la période sélectionnée</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Niveau Maximum</CardTitle>
-              <Activity className="w-4 h-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{metrics.maxLevel.toFixed(2)} m</div>
-              <p className="text-xs text-muted-foreground mt-1">Pic enregistré</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-lg">
-              {channelData ? `Station: ${channelData.name}` : "Graphique des Niveaux"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[500px]">
-              {isLoading && (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span>Chargement des données...</span>
-                  </div>
-                </div>
-              )}
-              {error && (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <p className="text-destructive font-medium">{error}</p>
-                    <p className="text-sm text-muted-foreground mt-2">Veuillez réessayer ultérieurement</p>
-                  </div>
-                </div>
-              )}
-              {!isLoading && !error && <Line options={chartOptions} data={chartData} />}
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+      {/* Graphique principal */}
+      <div className="mt-4 h-[50vh] md:h-[60vh] bg-white p-4 rounded-lg border">
+        {isLoading && <p className="text-center">Chargement des données...</p>}
+        {error && <p className="text-red-500 text-center">{error}</p>}
+        {!isLoading && !error && <Line options={chartOptions} data={chartData} />}
+      </div>
     </div>
   )
 }
