@@ -74,7 +74,7 @@ export const channels: Channel[] = [
   { id: 2784680, name: "ss", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2784692, name: "RD6 Sidi Mehrez", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2785670, name: "SRT2_Midoune", enableFlowCalculation: false, emailGroup: 1 },
-  { id: 2785177, name: "RD4 Sidi Mehrez", enableFlowCalculation: false, emailGroup: 1 },
+  { id: 2785177, name: "PIT Saline", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2764879, name: "SI_SR3", surface: 12.5, enableFlowCalculation: true, emailGroup: 3 },
   { id: 2764887, name: "SI_SP3", surface: 28.5, enableFlowCalculation: true, emailGroup: 3 },
   {
