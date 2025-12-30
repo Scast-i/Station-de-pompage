@@ -33,7 +33,7 @@ export interface ProcessedData {
 export type ChannelConfig = Channel
 
 export const channels: Channel[] = [
-  { id: 2791635, name: "SPTR Ajim", enableFlowCalculation: false, nthThreshold: 3.2, ntbThreshold: 1.5, emailGroup: 1 },
+  { id: 2791635, name: " Ajim", enableFlowCalculation: false, nthThreshold: 3.2, ntbThreshold: 1.5, emailGroup: 1 },
   { id: 2791703, name: "MI_SRT3", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2792378, name: "Med_SPTR", enableFlowCalculation: false, emailGroup: 1 },
   { id: 2791830, name: "SP4 Houmet Souk", enableFlowCalculation: false, emailGroup: 1 },
