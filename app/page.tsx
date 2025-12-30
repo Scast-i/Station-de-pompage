@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -14,26 +14,17 @@ import { useThingSpeakData } from "@/hooks/useThingSpeakData"
 import { useFlowCalculations } from "@/hooks/useFlowCalculations"
 import { downloadCSV } from "@/utils/csvExport"
 import { DailyVolumeTable } from "@/components/daily-volume-table"
-import { Line, Bar } from "react-chartjs-2"
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js"
+import dynamic from "next/dynamic"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
+const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), { ssr: false })
+const Bar = dynamic(() => import("react-chartjs-2").then((mod) => mod.Bar), { ssr: false })
 
 const colors = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"]
 
-export default function ThingSpeakVisualizer() {
+export default function StationDePompage() {
+  const [mounted, setMounted] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState<Channel>(channels[0])
   const [startDate, setStartDate] = useState<Date | undefined>(new Date())
   const [startTime, setStartTime] = useState("00:00")
@@ -43,26 +34,41 @@ export default function ThingSpeakVisualizer() {
   const [flowIndexField, setFlowIndexField] = useState("field5")
   const [activeTab, setActiveTab] = useState("graphique")
 
-  // Calculer la différence en jours pour l'indicateur
+  useEffect(() => {
+    setMounted(true)
+
+    if (typeof window !== "undefined") {
+      import("chart.js").then((ChartJS) => {
+        ChartJS.Chart.register(
+          ChartJS.CategoryScale,
+          ChartJS.LinearScale,
+          ChartJS.PointElement,
+          ChartJS.LineElement,
+          ChartJS.BarElement,
+          ChartJS.Title,
+          ChartJS.Tooltip,
+          ChartJS.Legend,
+        )
+      })
+    }
+  }, [])
+
   const daysDifference = useMemo(() => {
     if (!startDate || !endDate) return 0
     return differenceInDays(endDate, startDate) + 1
   }, [startDate, endDate])
 
-  // Récupération des données ThingSpeak
   const { channelData, isLoading, error } = useThingSpeakData(
     selectedChannel.id,
     startDate ? `${format(startDate, "yyyy-MM-dd", { locale: fr })}T${startTime}:00` : "",
     endDate ? `${format(endDate, "yyyy-MM-dd", { locale: fr })}T${endTime}:59` : "",
   )
 
-  // Calculs des débits
   const { processedData, averageQEntree, totalQSortie, volumeIndex, dailyVolumes } = useFlowCalculations(
     channelData?.data.field1 || [],
     selectedChannel,
   )
 
-  // Fonction pour télécharger les données en CSV
   const handleDownloadCSV = () => {
     if (processedData.length === 0) return
 
@@ -70,7 +76,6 @@ export default function ThingSpeakVisualizer() {
     downloadCSV(processedData, filename)
   }
 
-  // Fonction pour télécharger les volumes journaliers en CSV
   const handleDownloadDailyVolumesCSV = () => {
     if (dailyVolumes.length === 0) return
 
@@ -103,7 +108,6 @@ export default function ThingSpeakVisualizer() {
     const datasets = [
       ...Object.entries(channelData.fields).flatMap(([fieldKey, fieldName], index) => {
         if (fieldKey === "field1") {
-          // Niveau
           return [
             {
               label: "Niveau brut",
@@ -126,7 +130,6 @@ export default function ThingSpeakVisualizer() {
               : []),
           ]
         } else {
-          // Autres champs
           return {
             label: fieldName,
             data: channelData.data[fieldKey].map((item) => item.value),
@@ -163,7 +166,6 @@ export default function ThingSpeakVisualizer() {
     return { labels, datasets }
   }, [channelData, processedData, selectedChannel.enableFiltering, selectedChannel.enableFlowCalculation])
 
-  // Configuration du graphique
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -184,14 +186,14 @@ export default function ThingSpeakVisualizer() {
         },
       },
       y: {
-        position: "right",
+        position: "right" as const,
         title: {
           display: true,
           text: "Débit (m³/h)",
         },
       },
       y_level: {
-        position: "left",
+        position: "left" as const,
         title: {
           display: true,
           text: "Niveau (m)",
@@ -203,10 +205,8 @@ export default function ThingSpeakVisualizer() {
     },
   }
 
-  // Données pour le graphique des volumes journaliers
   const dailyVolumeChartData = useMemo(() => {
-    // Limiter le nombre de jours affichés si nécessaire pour éviter la surcharge du graphique
-    const maxBarsToShow = 31 // Limiter à 31 jours maximum pour la lisibilité
+    const maxBarsToShow = 31
 
     let volumesToShow = [...dailyVolumes]
     if (volumesToShow.length > maxBarsToShow) {
@@ -268,7 +268,6 @@ export default function ThingSpeakVisualizer() {
     },
   }
 
-  // Calcul de statistiques sur les volumes journaliers
   const volumeStats = useMemo(() => {
     if (dailyVolumes.length === 0) {
       return { total: 0, average: 0, max: 0, min: 0 }
@@ -282,11 +281,20 @@ export default function ThingSpeakVisualizer() {
     return { total, average, max, min }
   }, [dailyVolumes])
 
+  if (!mounted) {
+    return (
+      <div className="container mx-auto p-4 max-w-full overflow-x-hidden">
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-full overflow-x-hidden">
       <h1 className="text-2xl font-bold mb-4">Station de Pompage - Vision </h1>
 
-      {/* Sélection des paramètres */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <Select
           value={selectedChannel.id.toString()}
@@ -314,7 +322,6 @@ export default function ThingSpeakVisualizer() {
           </SelectContent>
         </Select>
 
-        {/* Sélection date/heure début */}
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -333,7 +340,6 @@ export default function ThingSpeakVisualizer() {
           <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-[100px]" />
         </div>
 
-        {/* Sélection date/heure fin */}
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -353,7 +359,6 @@ export default function ThingSpeakVisualizer() {
         </div>
       </div>
 
-      {/* Indicateur de période */}
       {daysDifference > 7 && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-center gap-2">
@@ -366,7 +371,6 @@ export default function ThingSpeakVisualizer() {
         </div>
       )}
 
-      {/* Indicateur de chargement */}
       {isLoading && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center">
           <Loader2 className="h-6 w-6 text-blue-600 animate-spin mr-2" />
@@ -376,7 +380,6 @@ export default function ThingSpeakVisualizer() {
         </div>
       )}
 
-      {/* Indicateurs de débit et bouton d'export */}
       {selectedChannel.enableFlowCalculation && channelData && !isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -416,7 +419,6 @@ export default function ThingSpeakVisualizer() {
         </div>
       )}
 
-      {/* Information sur les pompes si applicable */}
       {selectedChannel.usePumpFlow && selectedChannel.pumps && channelData && !isLoading && (
         <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
           <h3 className="text-sm font-semibold text-gray-800 mb-2">État des pompes</h3>
@@ -443,7 +445,6 @@ export default function ThingSpeakVisualizer() {
         </div>
       )}
 
-      {/* Onglets pour graphique et volumes journaliers */}
       {selectedChannel.enableFlowCalculation && !isLoading && !error && (
         <Tabs defaultValue="graphique" className="mt-4">
           <TabsList className="grid w-full grid-cols-2">
@@ -452,7 +453,7 @@ export default function ThingSpeakVisualizer() {
           </TabsList>
           <TabsContent value="graphique" className="mt-2">
             <div className="h-[50vh] md:h-[60vh] bg-white p-4 rounded-lg border">
-              <Line options={chartOptions} data={chartData} />
+              {mounted && <Line options={chartOptions} data={chartData} />}
             </div>
           </TabsContent>
           <TabsContent value="volumes" className="mt-2">
@@ -472,7 +473,6 @@ export default function ThingSpeakVisualizer() {
 
               {dailyVolumes.length > 0 ? (
                 <>
-                  {/* Statistiques des volumes journaliers */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <h4 className="text-xs font-semibold text-blue-800">Volume Total</h4>
@@ -494,7 +494,7 @@ export default function ThingSpeakVisualizer() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="h-[400px]">
-                      <Bar options={dailyVolumeChartOptions} data={dailyVolumeChartData} />
+                      {mounted && <Bar options={dailyVolumeChartOptions} data={dailyVolumeChartData} />}
                       {dailyVolumes.length > 31 && (
                         <p className="text-xs text-gray-500 text-center mt-2">
                           Affichage limité aux {Math.min(31, dailyVolumes.length)} derniers jours pour la lisibilité
@@ -514,7 +514,6 @@ export default function ThingSpeakVisualizer() {
         </Tabs>
       )}
 
-      {/* Graphique principal (affiché uniquement si les onglets ne sont pas disponibles) */}
       {(!selectedChannel.enableFlowCalculation || isLoading || error) && (
         <div className="mt-4 h-[50vh] md:h-[60vh] bg-white p-4 rounded-lg border">
           {isLoading && (
@@ -531,7 +530,7 @@ export default function ThingSpeakVisualizer() {
             </div>
           )}
           {error && <p className="text-red-500 text-center">{error}</p>}
-          {!isLoading && !error && <Line options={chartOptions} data={chartData} />}
+          {!isLoading && !error && mounted && <Line options={chartOptions} data={chartData} />}
         </div>
       )}
     </div>
