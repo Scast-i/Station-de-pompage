@@ -1,0 +1,18 @@
+export const useFlowCalculations = (data: any[], channel: ChannelConfig): FlowCalculationResult => {
+  // Retourner des valeurs par défaut si désactivé
+  if (!channel.enableFlowCalculation) {
+    return {
+      processedData: [],
+      averageQEntree: 0,
+      totalQSortie: 0,
+      volumeIndex: 0
+    };
+  }
+
+  // Vérification de la configuration requise
+  if (!channel.surface) {
+    throw new Error(`Surface non définie pour la chaîne ${channel.name}`);
+  }
+
+  
+};

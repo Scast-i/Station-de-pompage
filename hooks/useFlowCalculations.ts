@@ -2,12 +2,14 @@
 
 import { useMemo } from "react"
 import type { Channel, ProcessedData } from "@/config/channels"
+import { format } from "date-fns"
 
 interface FlowCalculationResult {
   processedData: ProcessedData[]
   averageQEntree: number
   totalQSortie: number
   volumeIndex: number
+  dailyVolumes: { date: Date; volume: number }[]
 }
 
 function movingAverage(data: number[], windowSize: number): number[] {
@@ -20,6 +22,18 @@ function movingAverage(data: number[], windowSize: number): number[] {
     result.push(average)
   }
   return result
+}
+
+function calculatePumpFlow(channel: Channel, pumpStates: number[]): number {
+  if (!channel.usePumpFlow || !channel.pumps) return 0
+
+  return channel.pumps.reduce((total, pump, index) => {
+    // Make sure we don't go out of bounds
+    if (index < pumpStates.length) {
+      return total + (pumpStates[index] === 1 ? pump.flowRate : 0)
+    }
+    return total
+  }, 0)
 }
 
 export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculationResult => {
@@ -36,6 +50,7 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
         averageQEntree: 0,
         totalQSortie: 0,
         volumeIndex: 0,
+        dailyVolumes: [],
       }
     }
 
@@ -48,6 +63,9 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
     let lastTrend: "rising" | "falling" | null = null
     const processedData: ProcessedData[] = []
 
+    // Pour le calcul du volume journalier - utilisons une Map pour garantir l'unicité des jours
+    const dailyVolumeMap = new Map<string, number>()
+
     // Apply filtering if enabled
     const levels = data.map((item) => item.value / 100) // Conversion cm -> m
     const filteredLevels =
@@ -55,9 +73,14 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
 
     // Use filteredLevels for all subsequent calculations
     filteredLevels.forEach((currentLevel, index) => {
+      const currentDate = new Date(data[index].date)
+
+      // Formatage de la date sans l'heure pour regrouper par jour
+      const dayKey = format(currentDate, "yyyy-MM-dd")
+
       if (index === 0) {
         processedData.push({
-          date: new Date(data[index].date),
+          date: currentDate,
           level: currentLevel,
           filteredLevel: channel.enableFiltering ? currentLevel : undefined,
           Q_entree: 0,
@@ -67,10 +90,10 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
         return
       }
 
-      const currentDate = new Date(data[index].date)
       const prevLevel = filteredLevels[index - 1]
       const deltaLevel = currentLevel - prevLevel
-      const deltaTimeHours = (currentDate.getTime() - new Date(data[index - 1].date).getTime()) / 3600000
+      const prevDate = new Date(data[index - 1].date)
+      const deltaTimeHours = (currentDate.getTime() - prevDate.getTime()) / 3600000
 
       if (deltaTimeHours <= 0) {
         processedData.push({
@@ -98,10 +121,16 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
 
       let Q_sortie = 0
       if (currentTrend === "falling") {
-        Q_sortie = lastQEntree - (deltaLevel * channel.surface) / deltaTimeHours
-        volumeAccumulator += Q_sortie * deltaTimeHours
+        Q_sortie = Math.max(0, lastQEntree - (deltaLevel * channel.surface) / deltaTimeHours)
+        const volumeForInterval = Q_sortie * deltaTimeHours
+        volumeAccumulator += volumeForInterval
         totalTime += deltaTimeHours
         lastTrend = "falling"
+
+        // Calcul du volume journalier - ajout du volume à la journée correspondante
+        if (volumeForInterval > 0) {
+          dailyVolumeMap.set(dayKey, (dailyVolumeMap.get(dayKey) || 0) + volumeForInterval)
+        }
       }
 
       processedData.push({
@@ -114,11 +143,20 @@ export const useFlowCalculations = (data: any[], channel: Channel): FlowCalculat
       })
     })
 
+    // Convertir la Map en tableau pour l'affichage
+    const dailyVolumes = Array.from(dailyVolumeMap.entries())
+      .map(([dateStr, volume]) => ({
+        date: new Date(dateStr),
+        volume,
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+
     return {
       processedData,
       averageQEntree: risingSampleCount > 0 ? totalQEntreeSum / risingSampleCount : 0,
       totalQSortie: volumeAccumulator,
       volumeIndex: volumeAccumulator,
+      dailyVolumes,
     }
   }, [data, channel.enableFlowCalculation, channel.surface, channel.enableFiltering, channel.filterWindowSize])
 }
